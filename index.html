@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Eco Nativo Dual</title>
+    
+    <!-- Meta etiquetas para WhatsApp y Redes Sociales -->
+    <meta property="og:title" content="Eco Nativo Dual">
+    <meta property="og:description" content="Traductor simultáneo cara a cara para conductores y viajeros.">
+    <!-- Si ves que el icono no sale en WhatsApp, cambia 'icon-512.png' por tu dirección completa de GitHub -->
+    <meta property="og:image" content="icon-512.png">
+    <meta property="og:type" content="website">
+
+    <!-- Enlaces para PWA (Instalación) -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e1e1e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <style>
+        :root {
+            --bg-me: #1e1e1e;
+            --bg-client: #ffffff;
+            --c-idle: #ea4335;
+            --c-me: #4285f4;
+            --c-client: #34a853;
+        }
+
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+            font-family: -apple-system, system-ui, sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body, html { 
+            height: 100dvh; 
+            max-height: 100dvh;
+            overflow: hidden; 
+            background-color: #000;
+            display: flex; 
+            flex-direction: column;
+            user-select: none;
+            position: relative;
+        }
+
+        /* Botón Compartir */
+        .share-btn {
+            position: absolute;
+            top: calc(10px + env(safe-area-inset-top));
+            right: 20px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2000;
+            color: white;
+        }
+
+        #splash {
+            position: fixed;
+            inset: 0;
+            background: #1e1e1e;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            transition: opacity 0.5s ease;
+        }
+        #splash.hidden { opacity: 0; pointer-events: none; }
+
+        #part-client {
+            height: 50dvh;
+            background-color: var(--bg-client);
+            transform: rotate(180deg);
+            display: flex; 
+            flex-direction: column;
+            padding: 40px 30px; 
+            justify-content: center; 
+            align-items: center;
+            position: relative;
+            border-bottom: 1px solid #ddd;
+        }
+
+        #part-me {
+            height: 50dvh;
+            background-color: var(--bg-me);
+            color: white;
+            display: flex; 
+            flex-direction: column;
+            padding: 30px; 
+            justify-content: center; 
+            align-items: center;
+            position: relative;
+            padding-bottom: calc(100px + env(safe-area-inset-bottom));
+        }
+
+        .lang-label {
+            font-size: 11px; 
+            font-weight: 900; 
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+        #part-client .lang-label { color: #555; }
+
+        .text-display {
+            font-size: 26px; 
+            font-weight: 700; 
+            text-align: center;
+            width: 100%; 
+            line-height: 1.3;
+            max-height: 150px;
+            overflow: hidden;
+        }
+        .client-text { color: #333; }
+        .me-text { color: #fff; }
+
+        .controls {
+            position: absolute; 
+            top: 50%; 
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 500; 
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mic-wrapper {
+            position: absolute;
+            pointer-events: auto;
+            transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .mic-btn {
+            width: 85px; 
+            height: 85px; 
+            border-radius: 50%;
+            border: 6px solid #000; 
+            background: var(--c-idle); 
+            color: white; 
+            font-size: 35px; 
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .controls.pos-me .mic-wrapper { transform: translateY(60px); }
+        .controls.pos-client .mic-wrapper { transform: translateY(-60px); }
+        .mode-me .mic-btn { background: var(--c-me); box-shadow: 0 0 30px var(--c-me); }
+        .mode-client .mic-btn { background: var(--c-client); box-shadow: 0 0 30px var(--c-client); }
+
+        .flags {
+            position: absolute; 
+            bottom: calc(30px + env(safe-area-inset-bottom)); 
+            display: flex; 
+            gap: 15px;
+            z-index: 600; 
+            pointer-events: auto;
+        }
+        
+        .flag-btn {
+            font-size: 26px; 
+            background: rgba(255,255,255,0.1); 
+            border: 2px solid transparent; 
+            cursor: pointer; 
+            border-radius: 50%; 
+            width: 55px; 
+            height: 55px;
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            transition: all 0.2s ease;
+        }
+        
+        .flag-btn.active { 
+            border-color: var(--c-me); 
+            background: rgba(255,255,255,0.2); 
+            transform: scale(1.1); 
+        }
+
+        #lang-label-wrapper { transition: transform 0.5s ease; }
+        .shift-label { transform: translateY(-20px); }
+    </style>
+</head>
+<body>
+
+    <!-- Botón de compartir nativo -->
+    <button class="share-btn" onclick="compartirApp()">📤</button>
+
+    <div id="splash">
+        <div style="font-size: 60px; margin-bottom: 20px;">🗣️</div>
+        <h2 style="letter-spacing: 4px; font-weight: 300;">ECO NATIVO DUAL</h2>
+    </div>
+
+    <div id="part-client">
+        <div id="lang-label-wrapper">
+            <div class="lang-label" id="label-client">INGLÉS</div>
+        </div>
+        <div class="text-display client-text" id="text-client">...</div>
+    </div>
+
+    <div class="controls" id="control-zone">
+        <div class="mic-wrapper">
+            <button class="mic-btn" id="main-mic" onclick="toggleApp()">🎙️</button>
+        </div>
+    </div>
+
+    <div id="part-me">
+        <div class="lang-label">ESPAÑOL (TÚ)</div>
+        <div class="text-display me-text" id="text-me">Pulsa el botón para iniciar</div>
+        
+        <div class="flags">
+            <button class="flag-btn active" onclick="setLang('en', 'Inglés', event)">🇬🇧</button>
+            <button class="flag-btn" onclick="setLang('fr', 'Francés', event)">🇫🇷</button>
+            <button class="flag-btn" onclick="setLang('de', 'Alemán', event)">🇩🇪</button>
+            <button class="flag-btn" onclick="setLang('it', 'Italiano', event)">🇮🇹</button>
+        </div>
+    </div>
+
+    <script>
+        // REGISTRO DEL SERVICE WORKER
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log("SW OK"));
+        }
+
+        // FUNCIÓN COMPARTIR
+        async function compartirApp() {
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Eco Nativo Dual',
+                        text: 'Traductor simultáneo para conductores.',
+                        url: window.location.href
+                    });
+                } catch (err) { console.log(err); }
+            } else {
+                alert("Copia la URL para compartir");
+            }
+        }
+
+        let targetLang = 'en';
+        let isRunning = false;
+        let currentTurn = 'me'; 
+        let autoStopTimer;
+
+        const langCodes = { 'en': 'en-US', 'fr': 'fr-FR', 'de': 'de-DE', 'it': 'it-IT' };
+
+        window.onload = () => {
+            setTimeout(() => document.getElementById('splash').classList.add('hidden'), 1500);
+        };
+
+        function setLang(lang, name, event) {
+            targetLang = lang;
+            document.getElementById('label-client').innerText = name;
+            document.querySelectorAll('.flag-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            if(navigator.vibrate) navigator.vibrate(50);
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+
+        function toggleApp() {
+            if (isRunning) {
+                stopConversation();
+            } else {
+                isRunning = true;
+                currentTurn = 'me';
+                startListening();
+            }
+        }
+
+        function updateUI() {
+            const container = document.getElementById('control-zone');
+            const labelWrapper = document.getElementById('lang-label-wrapper');
+            
+            if (!isRunning) {
+                container.className = 'controls';
+                labelWrapper.className = '';
+                return;
+            }
+
+            if (currentTurn === 'me') {
+                container.className = 'controls pos-me mode-me';
+                labelWrapper.className = ''; 
+            } else {
+                container.className = 'controls pos-client mode-client';
+                labelWrapper.className = 'shift-label'; 
+            }
+        }
+
+        function startListening() {
+            if (!isRunning) return;
+            updateUI();
+            
+            clearTimeout(autoStopTimer);
+            autoStopTimer = setTimeout(stopConversation, 15000);
+
+            if (currentTurn === 'me') {
+                recognition.lang = 'es-ES';
+                document.getElementById('text-me').innerText = "🎤 Habla ahora...";
+            } else {
+                recognition.lang = langCodes[targetLang];
+                document.getElementById('text-client').innerText = "🎤 Escuchando...";
+            }
+
+            try { recognition.start(); } catch(e) {}
+        }
+
+        recognition.onresult = async (event) => {
+            clearTimeout(autoStopTimer);
+            const transcript = event.results[0][0].transcript;
+            
+            const from = currentTurn === 'me' ? 'es' : targetLang; 
+            const to = currentTurn === 'me' ? targetLang : 'es';
+
+            if (currentTurn === 'me') document.getElementById('text-me').innerText = transcript;
+            else document.getElementById('text-client').innerText = transcript;
+
+            try {
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(transcript)}&langpair=${from}|${to}`);
+                const data = await res.json();
+                let translated = data.responseData.translatedText;
+
+                if (currentTurn === 'me') {
+                    document.getElementById('text-client').innerText = translated;
+                    speak(translated, langCodes[targetLang], () => {
+                        currentTurn = 'client';
+                        setTimeout(startListening, 600);
+                    });
+                } else {
+                    document.getElementById('text-me').innerText = translated;
+                    speak(translated, 'es-ES', () => {
+                        currentTurn = 'me';
+                        setTimeout(startListening, 600);
+                    });
+                }
+            } catch (e) {
+                startListening();
+            }
+        };
+
+        recognition.onerror = () => {
+            if (isRunning) setTimeout(startListening, 600);
+        };
+
+        function speak(text, lang, callback) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = lang;
+            u.rate = 0.95;
+            u.onend = callback;
+            window.speechSynthesis.speak(u);
+        }
+
+        function stopConversation() {
+            isRunning = false;
+            clearTimeout(autoStopTimer);
+            try { recognition.stop(); } catch(e) {}
+            window.speechSynthesis.cancel();
+            document.getElementById('text-me').innerText = "Modo reposo";
+            document.getElementById('text-client').innerText = "...";
+            updateUI();
+        }
+
+        document.addEventListener("visibilitychange", () => { if (document.hidden) stopConversation(); });
+    </script>
+</body>
+</html>
